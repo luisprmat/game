@@ -3,5 +3,5 @@ import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue'
 </script>
 
 <template>
-    <AuthenticatedLayout> Testing! </AuthenticatedLayout>
+    <AuthenticatedLayout>{{ $page.props }}</AuthenticatedLayout>
 </template>
