@@ -8,7 +8,7 @@ import { router } from '@inertiajs/vue3'
 
 const props = defineProps(['game'])
 
-const boardState = ref([0, 0, 0, 0, 0, 0, 0, 0, 0])
+const boardState = ref(props.game.state ?? [0, 0, 0, 0, 0, 0, 0, 0, 0])
 const gameState = useGameState()
 const players = ref([])
 
@@ -34,6 +34,10 @@ const lines = [
 
 const fillSquare = (index) => {
     boardState.value[index] = xTurn.value ? -1 : 1
+
+    router.put(route('games.update', props.game.id), {
+        state: boardState.value,
+    })
 
     checkForVictory()
 }
@@ -76,6 +80,9 @@ Echo.join(`games.${props.game.id}`)
         (user) =>
             (players.value = players.value.filter(({ id }) => id !== user.id))
     )
+    .listen('PlayerMadeMove', ({ game }) => {
+        boardState.value = game.state
+    })
 
 onUnmounted(() => {
     Echo.leave(`games.${props.game.id}`)
