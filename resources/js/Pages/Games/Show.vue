@@ -1,12 +1,16 @@
 <script setup>
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue'
-import { computed, ref } from 'vue'
+import { computed, onUnmounted, ref } from 'vue'
 import Modal from '@/Components/Modal.vue'
 import PrimaryButton from '@/Components/PrimaryButton.vue'
 import { useGameState, gameStates } from '@/Composables/useGameState'
+import { router } from '@inertiajs/vue3'
+
+const props = defineProps(['game'])
 
 const boardState = ref([0, 0, 0, 0, 0, 0, 0, 0, 0])
 const gameState = useGameState()
+const players = ref([])
 
 const xTurn = computed(
     () => boardState.value.reduce((carry, value) => carry + value, 0) === 0
@@ -60,6 +64,22 @@ const resetGame = () => {
     boardState.value = [0, 0, 0, 0, 0, 0, 0, 0, 0]
     gameState.change(gameStates.InProgress)
 }
+
+Echo.join(`games.${props.game.id}`)
+    .here((users) => (players.value = users))
+    .joining((user) =>
+        router.reload({
+            onSuccess: () => players.value.push(user),
+        })
+    )
+    .leaving(
+        (user) =>
+            (players.value = players.value.filter(({ id }) => id !== user.id))
+    )
+
+onUnmounted(() => {
+    Echo.leave(`games.${props.game.id}`)
+})
 </script>
 
 <template>
@@ -83,6 +103,43 @@ const resetGame = () => {
                 ></span>
             </li>
         </menu>
+
+        <ul
+            class="mx-auto mt-6 max-w-sm space-y-2 ps-4 sm:ps-0 dark:text-gray-200"
+        >
+            <li class="flex items-center gap-2">
+                <span
+                    class="rounded bg-gray-200 p-1.5 font-bold dark:bg-gray-700"
+                    >X</span
+                >
+                <span>{{ game.player_one.name }}</span>
+                <span
+                    :class="{
+                        '!bg-green-500': players.find(
+                            ({ id }) => id === game.player_one_id
+                        ),
+                    }"
+                    class="size-2 rounded-full bg-red-500"
+                ></span>
+            </li>
+
+            <li v-if="game.player_two" class="flex items-center gap-2">
+                <span
+                    class="rounded bg-gray-200 p-1.5 font-bold dark:bg-gray-700"
+                    >0</span
+                >
+                <span>{{ game.player_two.name }}</span>
+                <span
+                    :class="{
+                        '!bg-green-500': players.find(
+                            ({ id }) => id === game.player_two_id
+                        ),
+                    }"
+                    class="size-2 rounded-full bg-red-500"
+                ></span>
+            </li>
+            <li v-else>{{ $t('Waiting for player two') }}...</li>
+        </ul>
 
         <Modal @close="resetGame()" :show="gameState.hasEnded()">
             <div class="p-6">
