@@ -1,6 +1,6 @@
 <script setup>
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue'
-import { computed, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import Modal from '@/Components/Modal.vue'
 import PrimaryButton from '@/Components/PrimaryButton.vue'
 import { useGameState, gameStates } from '@/Composables/useGameState'
@@ -40,6 +40,32 @@ const lines = [
     [2, 4, 6],
 ]
 
+const channel = Echo.join(`games.${props.game.id}`)
+    .here((users) => (players.value = users))
+    .joining((user) =>
+        router.reload({
+            onSuccess: () => players.value.push(user),
+        })
+    )
+    .leaving(
+        (user) =>
+            (players.value = players.value.filter(({ id }) => id !== user.id))
+    )
+    .listenForWhisper('PlayerMadeMove', ({ state }) => {
+        boardState.value = state
+        checkForVictory()
+    })
+
+const updateOpponent = () => {
+    router.put(route('games.update', props.game.id), {
+        state: boardState.value,
+    })
+
+    channel.whisper('PlayerMadeMove', {
+        state: boardState.value,
+    })
+}
+
 const fillSquare = (index) => {
     if (!youTurn.value) {
         return
@@ -47,10 +73,7 @@ const fillSquare = (index) => {
 
     boardState.value[index] = xTurn.value ? -1 : 1
 
-    router.put(route('games.update', props.game.id), {
-        state: boardState.value,
-    })
-
+    updateOpponent()
     checkForVictory()
 }
 
@@ -83,26 +106,10 @@ const resetGame = () => {
     boardState.value = [0, 0, 0, 0, 0, 0, 0, 0, 0]
     gameState.change(gameStates.InProgress)
 
-    router.put(route('games.update', props.game.id), {
-        state: boardState.value,
-    })
+    updateOpponent()
 }
 
-Echo.join(`games.${props.game.id}`)
-    .here((users) => (players.value = users))
-    .joining((user) =>
-        router.reload({
-            onSuccess: () => players.value.push(user),
-        })
-    )
-    .leaving(
-        (user) =>
-            (players.value = players.value.filter(({ id }) => id !== user.id))
-    )
-    .listen('PlayerMadeMove', ({ game }) => {
-        boardState.value = game.state
-        checkForVictory()
-    })
+onMounted(checkForVictory)
 
 onUnmounted(() => {
     Echo.leave(`games.${props.game.id}`)
